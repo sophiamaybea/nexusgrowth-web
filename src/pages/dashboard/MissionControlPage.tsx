@@ -23,29 +23,40 @@ export default function MissionControlPage() {
   const [kpis, setKpis] = useState<ComputedKpis | null>(null)
   const [activity, setActivity] = useState<ActivityEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const [depts, kpiData, feed] = await Promise.all([
-          getDepartments(),
-          getKpis(),
-          getActivityFeed(),
-        ])
-        setDepartments(depts)
-        setKpis(kpiData)
-        setActivity(feed)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load data')
-      } finally {
-        setLoading(false)
-      }
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const [depts, kpiData, feed] = await Promise.all([
+        getDepartments(),
+        getKpis(),
+        getActivityFeed(),
+      ])
+      setDepartments(depts)
+      setKpis(kpiData)
+      setActivity(feed)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     load()
   }, [])
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    try {
+      await load()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const kpiItems = kpis
     ? [
@@ -67,11 +78,12 @@ export default function MissionControlPage() {
           <p className="text-nexus-textMuted text-xs mt-0.5">Real-time operational overview</p>
         </div>
         <button
-          onClick={() => window.location.reload()}
-          className="flex items-center gap-1.5 text-nexus-textMuted hover:text-nexus-text text-xs transition-colors"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 text-nexus-textMuted hover:text-nexus-text text-xs transition-colors disabled:opacity-50"
         >
-          <RefreshCw size={12} />
-          Refresh
+          <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+          {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 

@@ -3,8 +3,8 @@ import { Panel } from '../../components/ui/Panel'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { Badge } from '../../components/ui/Badge'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
-import { getTransactions, getKpis, getTransactionTruthBadge } from '../../services/dashboard'
-import type { Transaction, ComputedKpis } from '../../types/dashboard'
+import { getTransactions, getKpis, getDepartments, getTransactionTruthBadge } from '../../services/dashboard'
+import type { Transaction, ComputedKpis, Department } from '../../types/dashboard'
 
 type TxCategory = 'all' | 'revenue' | 'expense' | 'payroll'
 
@@ -22,6 +22,7 @@ function formatCurrency(value: number): string {
 export default function FinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [kpis, setKpis] = useState<ComputedKpis | null>(null)
+  const [departments, setDepartments] = useState<Department[]>([])
   const [txFilter, setTxFilter] = useState<TxCategory>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -31,12 +32,14 @@ export default function FinancePage() {
       setLoading(true)
       setError(null)
       try {
-        const [txData, kpiData] = await Promise.all([
+        const [txData, kpiData, deptData] = await Promise.all([
           getTransactions(),
           getKpis(),
+          getDepartments(),
         ])
         setTransactions(txData)
         setKpis(kpiData)
+        setDepartments(deptData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data')
       } finally {
@@ -48,12 +51,23 @@ export default function FinancePage() {
 
   const filteredTx = transactions.filter((t) => txFilter === 'all' || t.type === txFilter)
 
-  const treasuryAllocation = kpis
+  const documentedRevenue = transactions
+    .filter((t) => t.type === 'revenue' && t.status === 'documented')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+
+  const documentedPayroll = transactions
+    .filter((t) => t.type === 'payroll' && t.status === 'documented')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+
+  const documentedExpense = transactions
+    .filter((t) => t.type === 'expense' && t.status === 'documented')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+
+  const treasuryAllocation = documentedRevenue > 0
     ? [
-        { label: 'Operating Reserve', pct: kpis.cashBalance > 0 ? 38 : 20, color: 'bg-nexus-accent' },
-        { label: 'Growth Investment', pct: kpis.cashBalance > 0 ? 28 : 15, color: 'bg-nexus-success' },
-        { label: 'Payroll Float', pct: 20, color: 'bg-nexus-warning' },
-        { label: 'Emergency Buffer', pct: kpis.cashBalance > 0 ? 14 : 35, color: 'bg-nexus-textMuted' },
+        { label: 'Payroll Float', pct: Math.min(100, Math.round((documentedPayroll / documentedRevenue) * 100)), color: 'bg-nexus-warning' },
+        { label: 'Operating Reserve', pct: Math.min(100, Math.round((documentedExpense / documentedRevenue) * 100)), color: 'bg-nexus-accent' },
+        { label: 'Growth Investment', pct: Math.max(0, Math.round(((documentedRevenue - documentedPayroll - documentedExpense) / documentedRevenue) * 100)), color: 'bg-nexus-success' },
       ]
     : []
 
@@ -61,12 +75,20 @@ export default function FinancePage() {
     .filter((t) => t.type === 'expense' || t.type === 'payroll')
     .reduce<Record<string, number>>((acc, t) => {
       const dept = t.department?.name || 'Unknown'
-      acc[dept] = (acc[dept] || 0) + Math.abs(Number(t.amount))
+      acc[dept] = (acc[dept] || 0) + Math.abs(t.amount)
       return acc
     }, {})
 
   const spendControls = Object.entries(spendByDept)
-    .map(([dept, used]) => ({ dept, used: Math.round(used / 1000), limit: 100 }))
+    .map(([dept, used]) => {
+      const budget = departments.find((d) => d.name === dept)?.budget ?? 0
+      return {
+        dept,
+        used: Math.round(used / 1000),
+        limit: Math.round(budget / 1000),
+      }
+    })
+    .filter((s) => s.used > 0)
     .slice(0, 3)
 
   return (
@@ -198,24 +220,31 @@ export default function FinancePage() {
               <div className="text-nexus-textMuted text-xs py-4 text-center">No spend data.</div>
             ) : (
               <div className="space-y-2">
-                {spendControls.map((s) => (
-                  <div key={s.dept}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-[11px] text-nexus-textMuted">{s.dept}</span>
-                      <span className={`text-[11px] font-medium ${
-                        s.used / s.limit > 0.8 ? 'text-nexus-warning' : 'text-nexus-text'
-                      }`}>£{s.used}K / £{s.limit}K</span>
+                {spendControls.map((s) => {
+                  const hasBudget = s.limit > 0
+                  const ratio = hasBudget ? s.used / s.limit : 0
+                  const overBudget = hasBudget && ratio > 0.8
+                  return (
+                    <div key={s.dept}>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-[11px] text-nexus-textMuted">{s.dept}</span>
+                        <span className={`text-[11px] font-medium ${
+                          overBudget ? 'text-nexus-warning' : 'text-nexus-text'
+                        }`}>
+                          £{s.used}K{hasBudget ? ` / £${s.limit}K` : ' spent'}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-nexus-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            overBudget ? 'bg-nexus-warning' : 'bg-nexus-accent'
+                          }`}
+                          style={{ width: hasBudget ? `${Math.min(ratio, 1) * 100}%` : '100%' }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-1.5 bg-nexus-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${
-                          s.used / s.limit > 0.8 ? 'bg-nexus-warning' : 'bg-nexus-accent'
-                        }`}
-                        style={{ width: `${(s.used / s.limit) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </Panel>

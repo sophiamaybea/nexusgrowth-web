@@ -1,6 +1,46 @@
 import { supabase } from '../lib/supabase'
 import type { Department, Transaction, ComputedKpis, ActivityEntry } from '../types/dashboard'
 
+type DepartmentRow = {
+  id: string
+  name: string
+  status: Department['status']
+  score: number
+  lead: string
+  open_tasks: number
+  budget: number
+  created_at: string
+  updated_at: string
+}
+
+type TransactionRow = {
+  id: string
+  description: string
+  department_id: string | null
+  amount: number | string
+  type: Transaction['type']
+  status: Transaction['status']
+  date: string
+  created_at: string
+  updated_at: string
+  department?: { name: string } | null
+}
+
+type AuditLogRow = {
+  id: string
+  actor: string | null
+  action: string
+  target: string | null
+  type: ActivityEntry['type']
+  created_at: string
+}
+
+function toNumber(value: number | string | null | undefined): number {
+  if (typeof value === 'number') return value
+  if (value === null || value === undefined) return 0
+  return Number(value)
+}
+
 function formatCurrency(value: number): string {
   const abs = Math.abs(value)
   const formatted = new Intl.NumberFormat('en-GB', {
@@ -19,9 +59,16 @@ export async function getDepartments(): Promise<Department[]> {
     .order('name', { ascending: true })
 
   if (error) throw error
-  return (data || []).map((row: any) => ({
-    ...row,
+  return (data || []).map((row: DepartmentRow): Department => ({
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    score: row.score,
+    lead: row.lead,
     openTasks: row.open_tasks,
+    budget: toNumber(row.budget),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
   }))
 }
 
@@ -32,7 +79,18 @@ export async function getTransactions(): Promise<Transaction[]> {
     .order('date', { ascending: false })
 
   if (error) throw error
-  return data || []
+  return (data || []).map((row: TransactionRow): Transaction => ({
+    id: row.id,
+    description: row.description,
+    department_id: row.department_id,
+    amount: toNumber(row.amount),
+    type: row.type,
+    status: row.status,
+    date: row.date,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    department: row.department ?? undefined,
+  }))
 }
 
 export async function getKpis(): Promise<ComputedKpis> {
@@ -44,8 +102,8 @@ export async function getKpis(): Promise<ComputedKpis> {
   if (txRes.error) throw txRes.error
   if (deptRes.error) throw deptRes.error
 
-  const transactions = txRes.data || []
-  const departments = deptRes.data || []
+  const transactions = (txRes.data || []) as TransactionRow[]
+  const departments = (deptRes.data || []) as DepartmentRow[]
 
   const now = new Date()
   const currentMonth = now.getMonth()
@@ -58,21 +116,21 @@ export async function getKpis(): Promise<ComputedKpis> {
 
   const revenueMtd = mtdTx
     .filter((t) => t.type === 'revenue')
-    .reduce((sum, t) => sum + Number(t.amount), 0)
+    .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
   const expensesMtd = mtdTx
     .filter((t) => t.type === 'expense' || t.type === 'payroll')
-    .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
+    .reduce((sum, t) => sum + Math.abs(toNumber(t.amount)), 0)
 
   const documentedRevenue = transactions
     .filter((t) => t.type === 'revenue' && t.status === 'documented')
-    .reduce((sum, t) => sum + Number(t.amount), 0)
+    .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
-  const allExpenses = transactions
-    .filter((t) => t.type === 'expense' || t.type === 'payroll')
-    .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
+  const documentedExpenses = transactions
+    .filter((t) => (t.type === 'expense' || t.type === 'payroll') && t.status === 'documented')
+    .reduce((sum, t) => sum + Math.abs(toNumber(t.amount)), 0)
 
-  const cashBalance = documentedRevenue - allExpenses
+  const cashBalance = documentedRevenue - documentedExpenses
   const netMargin = revenueMtd > 0 ? ((revenueMtd - expensesMtd) / revenueMtd) * 100 : 0
 
   return {
@@ -99,7 +157,7 @@ export async function getActivityFeed(): Promise<ActivityEntry[]> {
     return []
   }
 
-  return data.map((row: any) => ({
+  return data.map((row: AuditLogRow): ActivityEntry => ({
     id: row.id,
     time: new Date(row.created_at).toLocaleTimeString('en-GB', {
       hour: '2-digit',
@@ -107,8 +165,8 @@ export async function getActivityFeed(): Promise<ActivityEntry[]> {
     }),
     actor: row.actor || 'System',
     action: row.action || 'performed action',
-    target: row.target,
-    type: (row.type as ActivityEntry['type']) || 'system',
+    target: row.target ?? undefined,
+    type: row.type || 'system',
   }))
 }
 

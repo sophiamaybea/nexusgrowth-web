@@ -7,6 +7,11 @@ node_modules/
 dist/
 build/
 .vite/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Dependencies lockfile (generated)
+package-lock.json
 
 # Environment
 .env
