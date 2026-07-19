@@ -47,8 +47,8 @@ export default function SignInPage() {
           {/* Demo hint */}
           <div className="mb-4 p-3 rounded-lg border border-nexus-accent/20 bg-nexus-accent/5">
             <p className="text-[11px] text-nexus-textMuted">
-              <span className="text-nexus-accent font-medium">Demo — </span>
-              ceo@nexusgrowth.io / nexus2025
+              <span className="text-nexus-accent font-medium">Note — </span>
+              Use credentials issued by your Supabase auth provider.
             </p>
           </div>
 
