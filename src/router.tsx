@@ -4,6 +4,10 @@ import { createBrowserRouter, redirect } from 'react-router-dom'
 import PublicLayout from './layouts/PublicLayout'
 import DashboardLayout from './layouts/DashboardLayout'
 
+// Auth
+import { ProtectedRoute } from './auth/ProtectedRoute'
+import SignInPage from './pages/auth/SignInPage'
+
 // Public pages
 import HomePage from './pages/public/HomePage'
 import ServicesPage from './pages/public/ServicesPage'
@@ -25,6 +29,12 @@ import ChatPage from './pages/dashboard/ChatPage'
 import ReflectionPage from './pages/dashboard/ReflectionPage'
 
 export const router = createBrowserRouter([
+  // Auth
+  {
+    path: '/sign-in',
+    element: <SignInPage />,
+  },
+  // Public site
   {
     path: '/',
     element: <PublicLayout />,
@@ -38,9 +48,10 @@ export const router = createBrowserRouter([
       { path: 'contact',      element: <ContactPage /> },
     ],
   },
+  // Protected dashboard
   {
     path: '/dashboard',
-    element: <DashboardLayout />,
+    element: <ProtectedRoute><DashboardLayout /></ProtectedRoute>,
     children: [
       { index: true,                element: <MissionControlPage /> },
       { path: 'performance',        element: <DeptPerformancePage /> },

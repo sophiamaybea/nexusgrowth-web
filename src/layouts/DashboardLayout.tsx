@@ -2,22 +2,32 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, TrendingUp, DollarSign, Activity,
   CheckSquare, ShieldAlert, FileText, MessageSquare,
-  Brain, ExternalLink, Bell, Settings
+  Brain, ExternalLink, Bell, Settings, LogOut
 } from 'lucide-react'
+import { useAuth } from '../auth/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
 const SIDEBAR = [
-  { to: '/dashboard',            label: 'Mission Control', icon: LayoutDashboard, end: true },
+  { to: '/dashboard',            label: 'Mission Control',  icon: LayoutDashboard, end: true },
   { to: '/dashboard/performance',label: 'Dept Performance', icon: TrendingUp },
   { to: '/dashboard/finance',    label: 'Finance Overview', icon: DollarSign },
-  { to: '/dashboard/activity',   label: 'Activity Feed',   icon: Activity },
-  { to: '/dashboard/approvals',  label: 'Approvals Queue', icon: CheckSquare },
-  { to: '/dashboard/safety',     label: 'Safety Alerts',   icon: ShieldAlert },
-  { to: '/dashboard/reports',    label: 'Reports Inbox',   icon: FileText },
-  { to: '/dashboard/chat',       label: 'Dept Head Chat',  icon: MessageSquare },
-  { to: '/dashboard/reflection', label: 'Reflection',      icon: Brain },
+  { to: '/dashboard/activity',   label: 'Activity Feed',    icon: Activity },
+  { to: '/dashboard/approvals',  label: 'Approvals Queue',  icon: CheckSquare },
+  { to: '/dashboard/safety',     label: 'Safety Alerts',    icon: ShieldAlert },
+  { to: '/dashboard/reports',    label: 'Reports Inbox',    icon: FileText },
+  { to: '/dashboard/chat',       label: 'Dept Head Chat',   icon: MessageSquare },
+  { to: '/dashboard/reflection', label: 'Reflection',       icon: Brain },
 ]
 
 export default function DashboardLayout() {
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+
+  function handleSignOut() {
+    signOut()
+    navigate('/sign-in', { replace: true })
+  }
+
   return (
     <div className="flex h-screen bg-nexus-black overflow-hidden">
       {/* Sidebar */}
@@ -27,7 +37,7 @@ export default function DashboardLayout() {
           <span className="font-display font-semibold text-nexus-text">
             Nexus<span className="text-nexus-accent">Growth</span>
           </span>
-          <span className="ml-2 text-[10px] text-nexus-textMuted uppercase tracking-widest bg-nexus-muted px-1.5 py-0.5 rounded">CEO</span>
+          <span className="ml-2 text-[10px] text-nexus-textMuted uppercase tracking-widest bg-nexus-muted px-1.5 py-0.5 rounded">{user?.role ?? 'CEO'}</span>
         </div>
 
         {/* Navigation */}
@@ -54,10 +64,15 @@ export default function DashboardLayout() {
         {/* Bottom bar */}
         <div className="border-t border-nexus-border p-3 flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-nexus-accent/20 flex items-center justify-center">
-            <span className="text-nexus-accent text-xs font-semibold">C</span>
+            <span className="text-nexus-accent text-xs font-semibold">
+              {user?.name?.[0] ?? 'C'}
+            </span>
           </div>
-          <span className="text-nexus-textMuted text-xs flex-1">CEO</span>
-          <Settings size={14} className="text-nexus-textMuted hover:text-nexus-text cursor-pointer" />
+          <span className="text-nexus-textMuted text-xs flex-1 truncate">{user?.name ?? 'CEO'}</span>
+          <button onClick={handleSignOut} title="Sign out">
+            <LogOut size={13} className="text-nexus-textMuted hover:text-nexus-text cursor-pointer transition-colors" />
+          </button>
+          <Settings size={14} className="text-nexus-textMuted hover:text-nexus-text cursor-pointer transition-colors" />
         </div>
       </aside>
 
