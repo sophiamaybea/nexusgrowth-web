@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import type { User } from '@supabase/supabase-js'
 
 const SIDEBAR = [
   { to: '/dashboard',            label: 'Mission Control',  icon: LayoutDashboard, end: true },
@@ -19,9 +20,24 @@ const SIDEBAR = [
   { to: '/dashboard/reflection', label: 'Reflection',       icon: Brain },
 ]
 
+function getUserDisplayName(user: User | null): string {
+  if (!user) return 'CEO'
+  const meta = user.user_metadata
+  return meta?.full_name || meta?.name || user.email?.split('@')[0] || 'CEO'
+}
+
+function getUserRole(user: User | null): string {
+  if (!user) return 'CEO'
+  const meta = user.user_metadata
+  return meta?.role || 'CEO'
+}
+
 export default function DashboardLayout() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+
+  const displayName = getUserDisplayName(user)
+  const displayRole = getUserRole(user)
 
   function handleSignOut() {
     signOut()
@@ -37,7 +53,7 @@ export default function DashboardLayout() {
           <span className="font-display font-semibold text-nexus-text">
             Nexus<span className="text-nexus-accent">Growth</span>
           </span>
-          <span className="ml-2 text-[10px] text-nexus-textMuted uppercase tracking-widest bg-nexus-muted px-1.5 py-0.5 rounded">{user?.role ?? 'CEO'}</span>
+          <span className="ml-2 text-[10px] text-nexus-textMuted uppercase tracking-widest bg-nexus-muted px-1.5 py-0.5 rounded">{displayRole}</span>
         </div>
 
         {/* Navigation */}
@@ -65,10 +81,10 @@ export default function DashboardLayout() {
         <div className="border-t border-nexus-border p-3 flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-nexus-accent/20 flex items-center justify-center">
             <span className="text-nexus-accent text-xs font-semibold">
-              {user?.name?.[0] ?? 'C'}
+              {displayName[0]?.toUpperCase() ?? 'C'}
             </span>
           </div>
-          <span className="text-nexus-textMuted text-xs flex-1 truncate">{user?.name ?? 'CEO'}</span>
+          <span className="text-nexus-textMuted text-xs flex-1 truncate">{displayName}</span>
           <button onClick={handleSignOut} title="Sign out">
             <LogOut size={13} className="text-nexus-textMuted hover:text-nexus-text cursor-pointer transition-colors" />
           </button>
