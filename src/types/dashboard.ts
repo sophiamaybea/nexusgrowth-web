@@ -6,6 +6,7 @@ export interface Department {
   lead: string
   openTasks: number
   budget: number
+  earned: number
   created_at: string
   updated_at: string
 }

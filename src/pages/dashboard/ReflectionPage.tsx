@@ -1,67 +1,129 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Panel } from '../../components/ui/Panel'
 import { Badge } from '../../components/ui/Badge'
-import { Search } from 'lucide-react'
+import { TruthBadge } from '../../components/ui/TruthBadge'
+import { Search, ArrowUpCircle, XCircle, RotateCcw } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  getReflections,
+  promoteReflection,
+  killReflection,
+  openReflection,
+} from '../../services/reflections'
+import type { Reflection } from '../../types/reports'
 
 type Category = 'all' | 'lesson' | 'issue' | 'decision'
 
-interface ReflectionEntry {
-  id: string
-  date: string
-  title: string
-  summary: string
-  category: 'lesson' | 'issue' | 'decision'
-  promoted?: boolean
-  recurring?: boolean
-  dept: string
-}
-
-const ENTRIES: ReflectionEntry[] = [
-  { id: 'r1',  date: '18 Jul 2025', title: 'Infrastructure spend acceleration',       summary: 'Capex overage of 18% attributed to accelerated rack provisioning. Positive indicator — demand ahead of forecast.',          category: 'lesson',   promoted: true,  recurring: false, dept: 'Finance' },
-  { id: 'r2',  date: '15 Jul 2025', title: 'Sprint velocity correlation',             summary: 'Velocity gains track directly with reduced meeting load. Implement async stand-up permanently.',                            category: 'lesson',   promoted: true,  recurring: false, dept: 'Product' },
-  { id: 'r3',  date: '12 Jul 2025', title: 'Client onboarding delay pattern',         summary: 'Third successive onboarding delayed by legal review bottleneck. SLA breach risk if unresolved by Q3.',                    category: 'issue',    promoted: false, recurring: true,  dept: 'Client Success' },
-  { id: 'r4',  date: '10 Jul 2025', title: 'Approved: Staging → Production deploy',   summary: 'CEO authorised production deployment of sprint 13 build. Rollback plan confirmed with Zara.',                             category: 'decision', promoted: false, recurring: false, dept: 'Engineering' },
-  { id: 'r5',  date: '08 Jul 2025', title: 'Agent task loop detected',                summary: 'Open Claw agent entered a retry loop on task #203. Root cause: ambiguous success criteria. Resolved via tighter spec.',   category: 'issue',    promoted: false, recurring: true,  dept: 'Open Claw AI' },
-  { id: 'r6',  date: '05 Jul 2025', title: 'NPS upswing — client segment analysis',   summary: 'Enterprise NPS rose 13 points. SMB segment flat. Suggests differentiated support investment strategy needed.',           category: 'lesson',   promoted: true,  recurring: false, dept: 'Client Success' },
-  { id: 'r7',  date: '02 Jul 2025', title: 'Approved: Legal clause waiver on §7.4',   summary: 'Data residency clause waived for Atlas Dynamics under UK-US data bridge framework. Logged for compliance review.',        category: 'decision', promoted: false, recurring: false, dept: 'Legal' },
-  { id: 'r8',  date: '28 Jun 2025', title: 'Recurring: Budget forecast drift',        summary: 'Finance forecasts have drifted >10% vs actuals for three consecutive months. Model recalibration overdue.',               category: 'issue',    promoted: false, recurring: true,  dept: 'Finance' },
-]
-
 const CAT_COLORS: Record<string, 'warning' | 'info' | 'muted'> = {
-  lesson:   'info',
-  issue:    'warning',
+  lesson: 'info',
+  issue: 'warning',
   decision: 'muted',
 }
 
+const STATE_VARIANT: Record<Reflection['state'], 'success' | 'warning' | 'muted'> = {
+  promoted: 'success',
+  open: 'warning',
+  killed: 'muted',
+}
+
+function formatCurrency(value: number): string {
+  const formatted = new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.abs(value))
+  return `£${formatted}`
+}
+
 export default function ReflectionPage() {
-  const [query, setQuery]   = useState('')
+  const { user } = useAuth()
+  const [entries, setEntries] = useState<Reflection[]>([])
+  const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Category>('all')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
-  const filtered = ENTRIES.filter(e => {
-    const matchCat = filter === 'all' || e.category === filter
-    const q = query.toLowerCase()
-    const matchQ = !q || e.title.toLowerCase().includes(q) || e.summary.toLowerCase().includes(q) || e.dept.toLowerCase().includes(q)
-    return matchCat && matchQ
-  })
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getReflections()
+      setEntries(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load reflections')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const promoted = ENTRIES.filter(e => e.promoted)
-  const recurring = ENTRIES.filter(e => e.recurring)
+  useEffect(() => {
+    load()
+  }, [])
+
+  const actorName = user?.email || 'CEO'
+
+  const filtered = useMemo(
+    () =>
+      entries.filter(e => {
+        const matchCat = filter === 'all' || e.category === filter
+        const q = query.toLowerCase()
+        const matchQ =
+          !q ||
+          e.title.toLowerCase().includes(q) ||
+          e.summary.toLowerCase().includes(q) ||
+          e.dept.toLowerCase().includes(q)
+        return matchCat && matchQ
+      }),
+    [entries, filter, query],
+  )
+
+  const promoted = entries.filter(e => e.state === 'promoted')
+  const recurring = entries.filter(e => e.recurring && e.state !== 'killed')
+
+  async function handleAction(id: string, action: 'promote' | 'kill' | 'open') {
+    setBusyId(id)
+    setError(null)
+    try {
+      if (action === 'promote') await promoteReflection(id, actorName)
+      else if (action === 'kill') await killReflection(id, actorName)
+      else await openReflection(id, actorName)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update reflection')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-display font-semibold text-nexus-text">Reflection / Memory</h1>
 
+      {error && (
+        <div className="p-4 rounded-lg bg-nexus-danger/10 border border-nexus-danger/30 text-nexus-danger text-xs">
+          {error}
+        </div>
+      )}
+
       {/* Promoted lessons */}
       <Panel title="Promoted Lessons">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {promoted.map(e => (
-            <div key={e.id} className="p-3 rounded-lg bg-nexus-accent/5 border border-nexus-accent/20">
-              <p className="text-[11px] text-nexus-accent font-medium uppercase tracking-wider mb-1">{e.dept}</p>
-              <p className="text-sm text-nexus-text font-medium mb-1">{e.title}</p>
-              <p className="text-[11px] text-nexus-textMuted leading-relaxed">{e.summary}</p>
-            </div>
-          ))}
-        </div>
+        {loading ? (
+          <div className="text-nexus-textMuted text-sm py-4 text-center">Loading…</div>
+        ) : promoted.length === 0 ? (
+          <div className="text-nexus-textMuted text-sm py-4 text-center">No promoted lessons yet.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {promoted.map(e => (
+              <div key={e.id} className="p-3 rounded-lg bg-nexus-accent/5 border border-nexus-accent/20">
+                <p className="text-[11px] text-nexus-accent font-medium uppercase tracking-wider mb-1">{e.dept}</p>
+                <p className="text-sm text-nexus-text font-medium mb-1">{e.title}</p>
+                <p className="text-[11px] text-nexus-textMuted leading-relaxed">{e.summary}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </Panel>
 
       {/* Recurring issues */}
@@ -73,7 +135,7 @@ export default function ReflectionPage() {
                 <span className="status-dot warning mt-1.5" />
                 <div>
                   <p className="text-sm text-nexus-text">{e.title}</p>
-                  <p className="text-[11px] text-nexus-textMuted">{e.dept} · {e.date}</p>
+                  <p className="text-[11px] text-nexus-textMuted">{e.dept} · gap-discovery</p>
                 </div>
               </div>
             ))}
@@ -86,7 +148,7 @@ export default function ReflectionPage() {
         title="Reflection Log"
         titleRight={
           <div className="flex items-center gap-2">
-            {(['all','lesson','issue','decision'] as Category[]).map(c => (
+            {(['all', 'lesson', 'issue', 'decision'] as Category[]).map(c => (
               <button
                 key={c}
                 onClick={() => setFilter(c)}
@@ -111,26 +173,69 @@ export default function ReflectionPage() {
             onChange={e => setQuery(e.target.value)}
           />
         </div>
-        <div className="space-y-2">
-          {filtered.length === 0 && (
-            <p className="text-nexus-textMuted text-sm text-center py-6">No entries match your filter.</p>
-          )}
-          {filtered.map(e => (
-            <div key={e.id} className="flex items-start gap-4 p-3 rounded-lg bg-nexus-surface border border-nexus-border">
-              <div className="shrink-0 pt-0.5">
-                <Badge label={e.category} variant={CAT_COLORS[e.category]} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-0.5">
-                  <p className="text-sm text-nexus-text font-medium truncate">{e.title}</p>
-                  <span className="text-[11px] text-nexus-textMuted shrink-0">{e.date}</span>
+
+        {loading ? (
+          <div className="text-nexus-textMuted text-sm py-8 text-center">Loading reflections…</div>
+        ) : filtered.length === 0 ? (
+          <div className="text-nexus-textMuted text-sm py-6 text-center">No entries match your filter.</div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(e => (
+              <div key={e.id} className="flex items-start gap-4 p-3 rounded-lg bg-nexus-surface border border-nexus-border">
+                <div className="shrink-0 pt-0.5">
+                  <Badge label={e.category} variant={CAT_COLORS[e.category]} />
                 </div>
-                <p className="text-[11px] text-nexus-textMuted leading-relaxed">{e.summary}</p>
-                <p className="text-[10px] text-nexus-textMuted/60 mt-1">{e.dept}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <p className="text-sm text-nexus-text font-medium truncate">{e.title}</p>
+                    <Badge label={e.state} variant={STATE_VARIANT[e.state]} />
+                  </div>
+                  <p className="text-[11px] text-nexus-textMuted leading-relaxed">{e.summary}</p>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <p className="text-[10px] text-nexus-textMuted/60">{e.dept}</p>
+                    {e.financial_impact > 0 && (
+                      <span className="inline-flex items-center gap-1.5 text-[10px] text-nexus-textMuted">
+                        impact {formatCurrency(e.financial_impact)}
+                        <TruthBadge tier={e.financial_verified ? 'verified' : 'partial'} showLabel={false} />
+                      </span>
+                    )}
+                  </div>
+                  {e.state !== 'killed' && (
+                    <div className="flex items-center gap-2 mt-2">
+                      {e.state !== 'promoted' && (
+                        <button
+                          disabled={busyId === e.id}
+                          onClick={() => handleAction(e.id, 'promote')}
+                          className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-nexus-success/15 text-nexus-success border border-nexus-success/30 hover:bg-nexus-success/25 disabled:opacity-50"
+                        >
+                          <ArrowUpCircle size={12} /> Promote
+                        </button>
+                      )}
+                      <button
+                        disabled={busyId === e.id}
+                        onClick={() => handleAction(e.id, 'kill')}
+                        className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-nexus-danger/15 text-nexus-danger border border-nexus-danger/30 hover:bg-nexus-danger/25 disabled:opacity-50"
+                      >
+                        <XCircle size={12} /> Kill
+                      </button>
+                    </div>
+                  )}
+                  {e.state === 'killed' && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        disabled={busyId === e.id}
+                        onClick={() => handleAction(e.id, 'open')}
+                        className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-nexus-muted/40 text-nexus-textMuted border border-nexus-border hover:text-nexus-text disabled:opacity-50"
+                      >
+                        <RotateCcw size={12} /> Reopen
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </Panel>
     </div>
   )
