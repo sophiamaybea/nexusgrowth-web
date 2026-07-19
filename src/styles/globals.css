@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-nexus-black text-nexus-text font-body antialiased;
+    font-feature-settings: 'liga' 1, 'kern' 1;
+  }
+
+  * {
+    @apply border-nexus-border;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-nexus-muted rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-nexus-textMuted;
+  }
+}
+
+@layer components {
+  /* Glass panel primitive */
+  .glass-panel {
+    @apply bg-nexus-panel border border-nexus-border rounded-xl shadow-glass
+           backdrop-blur-sm bg-glass;
+  }
+
+  /* KPI card */
+  .kpi-card {
+    @apply glass-panel p-5 flex flex-col gap-1;
+  }
+
+  /* Status dot */
+  .status-dot {
+    @apply w-2 h-2 rounded-full inline-block;
+  }
+  .status-dot.healthy  { @apply bg-nexus-success; }
+  .status-dot.warning  { @apply bg-nexus-warning; }
+  .status-dot.critical { @apply bg-nexus-danger; }
+  .status-dot.idle     { @apply bg-nexus-textMuted; }
+
+  /* Navigation link */
+  .nav-link {
+    @apply text-nexus-textMuted hover:text-nexus-text transition-colors text-sm font-medium;
+  }
+  .nav-link.active {
+    @apply text-nexus-text;
+  }
+
+  /* Button primitives */
+  .btn-primary {
+    @apply bg-nexus-accent hover:bg-nexus-accentLt text-white font-medium
+           px-6 py-2.5 rounded-lg transition-all duration-200
+           shadow-accent hover:shadow-none;
+  }
+  .btn-ghost {
+    @apply border border-nexus-border hover:border-nexus-textMuted
+           text-nexus-textMuted hover:text-nexus-text
+           px-6 py-2.5 rounded-lg transition-all duration-200;
+  }
+  .btn-gold {
+    @apply bg-nexus-gold hover:bg-nexus-goldLt text-nexus-black
+           font-semibold px-6 py-2.5 rounded-lg transition-all duration-200;
+  }
+}
