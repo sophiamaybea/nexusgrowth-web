@@ -25,7 +25,7 @@ export default function MissionControlPage() {
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         {kpiData.map(k => (
-          <KpiCard key={k.label} {...k} />
+          <KpiCard key={k.label} {...k} truthStatus={k.truthStatus} evidence={k.evidence} />
         ))}
       </div>
 

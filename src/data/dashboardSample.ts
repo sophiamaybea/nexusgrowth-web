@@ -1,13 +1,14 @@
 import type { ActivityEntry } from '../components/dashboard/ActivityItem'
 import type { DeptHealth } from '../components/dashboard/DeptHealthCard'
+import type { TruthStatus } from '../lib/truthState'
 
 export const kpiData = [
-  { label: 'Revenue MTD',      value: '£2.4M',  trend: 12,   status: 'healthy'  as const },
-  { label: 'Active Clients',   value: '47',     trend: 6,    status: 'healthy'  as const },
-  { label: 'Open Approvals',   value: '8',      trend: -3,   status: 'warning'  as const },
-  { label: 'Agent Tasks',      value: '124',    trend: 18,   status: 'healthy'  as const },
-  { label: 'Safety Alerts',    value: '2',      trend: 0,    status: 'warning'  as const },
-  { label: 'Pipeline Value',   value: '£18.6M', trend: 22,   status: 'healthy'  as const },
+  { label: 'Revenue MTD',      value: '£2.4M',  trend: 12,   status: 'healthy'  as const, truthStatus: 'DOCUMENTED'               as TruthStatus, evidence: 'Sum of cleared revenue Jul' },
+  { label: 'Active Clients',   value: '47',     trend: 6,    status: 'healthy'  as const, truthStatus: 'DOCUMENTED'               as TruthStatus, evidence: 'CRM active account count' },
+  { label: 'Open Approvals',   value: '8',      trend: -3,   status: 'warning'  as const, truthStatus: 'DOCUMENTED'               as TruthStatus, evidence: 'Approvals queue table' },
+  { label: 'Agent Tasks',      value: '124',    trend: 18,   status: 'healthy'  as const, truthStatus: 'DOCUMENTED'               as TruthStatus, evidence: 'Agent runtime task ledger' },
+  { label: 'Safety Alerts',    value: '2',      trend: 0,    status: 'warning'  as const, truthStatus: 'DOCUMENTED'               as TruthStatus, evidence: 'Audit log risk events' },
+  { label: 'Pipeline Value',   value: '£18.6M', trend: 22,   status: 'healthy'  as const, truthStatus: 'PROJECTION'              as TruthStatus, evidence: 'Weighted pipeline forecast' },
 ]
 
 export const deptHealth: DeptHealth[] = [
