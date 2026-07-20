@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabaseClient'
 import type { Department, Transaction, ComputedKpis, ActivityEntry } from '../types/dashboard'
 import { formatCurrency } from '../lib/format'
 
