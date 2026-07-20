@@ -92,3 +92,20 @@ export async function writeAuditLog(entry: {
   if (error) throw error
   return data
 }
+
+export async function countApprovalsByActionType(actionType: ActionType): Promise<number> {
+  const { count, error } = await supabase
+    .from('approvals')
+    .select('*', { count: 'exact', head: true })
+    .eq('action_type', actionType)
+  if (error) throw error
+  return count ?? 0
+}
+
+export async function setApprovalReference(id: string, reference: string): Promise<void> {
+  const { error } = await supabase
+    .from('approvals')
+    .update({ reference })
+    .eq('id', id)
+  if (error) throw error
+}

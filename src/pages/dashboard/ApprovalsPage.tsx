@@ -3,9 +3,8 @@ import { Panel } from '../../components/ui/Panel'
 import { Badge } from '../../components/ui/Badge'
 import { CheckCircle2, XCircle, Plus, ChevronRight } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
-import { supabase } from '../../lib/supabaseClient'
 import type { Approval, DecisionState, AuditLogEntry, ActionType, Priority, Risk } from '../../types/approval'
-import { fetchApprovals, createApproval, decideApproval, writeAuditLog } from '../../services/approvals'
+import { fetchApprovals, createApproval, decideApproval, writeAuditLog, countApprovalsByActionType, setApprovalReference } from '../../services/approvals'
 import { fetchAuditLog } from '../../services/auditLog'
 
 const PRIORITY_VARIANT: Record<Priority, 'warning' | 'info' | 'muted'> = {
@@ -30,15 +29,6 @@ function referencePrefix(actionType: ActionType): string {
 function generateReference(actionType: ActionType, count: number): string {
   const pad = String(count).padStart(2, '0')
   return `${referencePrefix(actionType)}-${pad}`
-}
-
-async function countByType(actionType: ActionType): Promise<number> {
-  const { count, error } = await supabase
-    .from('approvals')
-    .select('*', { count: 'exact', head: true })
-    .eq('action_type', actionType)
-  if (error) throw error
-  return count ?? 0
 }
 
 interface NewApprovalForm {
@@ -129,13 +119,9 @@ export default function ApprovalsPage() {
         owner: newForm.owner,
       })
 
-      const counts = await countByType(newForm.actionType)
+      const counts = await countApprovalsByActionType(newForm.actionType)
       const ref = generateReference(newForm.actionType, counts)
-      const { error: refError } = await supabase
-        .from('approvals')
-        .update({ reference: ref })
-        .eq('id', approval.id)
-      if (refError) console.error('Failed to set reference:', refError)
+      await setApprovalReference(approval.id, ref)
 
       await writeAuditLog({
         entityType: 'approval',
