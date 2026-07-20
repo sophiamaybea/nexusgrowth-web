@@ -28,6 +28,7 @@ export async function getReports(): Promise<Report[]> {
     priority: row.priority,
     status: row.status,
     financial_summary: row.financial_summary ?? null,
+    created_by: row.created_by ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }))

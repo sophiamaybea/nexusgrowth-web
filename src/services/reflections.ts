@@ -19,6 +19,7 @@ export async function getReflections(): Promise<Reflection[]> {
     recurring: row.recurring,
     financial_impact: Number(row.financial_impact ?? 0),
     financial_verified: row.financial_verified,
+    created_by: row.created_by ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }))

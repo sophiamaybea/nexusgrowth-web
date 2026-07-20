@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS reports (
   priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('high','medium','low')),
   status TEXT NOT NULL DEFAULT 'unread' CHECK (status IN ('unread','read','actioned')),
   financial_summary JSONB,
+  created_by UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS reflections (
   recurring BOOLEAN NOT NULL DEFAULT false,
   financial_impact DECIMAL(12,2) DEFAULT 0,
   financial_verified BOOLEAN NOT NULL DEFAULT false,
+  created_by UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -61,22 +63,20 @@ CREATE POLICY "Authenticated users can insert audit_log" ON audit_log
 
 CREATE POLICY "departments_read" ON departments
   FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "departments_update" ON departments
-  FOR UPDATE USING (auth.role() = 'authenticated');
 
 CREATE POLICY "reports_read" ON reports
   FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "reports_insert" ON reports
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated' AND created_by = auth.uid());
 CREATE POLICY "reports_update" ON reports
-  FOR UPDATE USING (auth.role() = 'authenticated');
+  FOR UPDATE USING (auth.role() = 'authenticated' AND (created_by = auth.uid() OR created_by IS NULL));
 
 CREATE POLICY "reflections_read" ON reflections
   FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "reflections_insert" ON reflections
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated' AND created_by = auth.uid());
 CREATE POLICY "reflections_update" ON reflections
-  FOR UPDATE USING (auth.role() = 'authenticated');
+  FOR UPDATE USING (auth.role() = 'authenticated' AND (created_by = auth.uid() OR created_by IS NULL));
 
 -- Seed departments with budget vs earned.
 UPDATE departments SET budget = 240000, earned = 198000 WHERE name = 'Strategy & Growth';
@@ -87,20 +87,20 @@ UPDATE departments SET budget = 150000, earned = 147300 WHERE name = 'Intelligen
 UPDATE departments SET budget = 90000,  earned = 12000  WHERE name = 'Compliance & Legal';
 
 -- Seed reports across the three producers.
-INSERT INTO reports (source, title, author, dept, priority, status, body, financial_summary) VALUES
-  ('rd_daily',       'R&D Daily — Model Inference Cost Spike', 'R&D Daily Bot', 'Technology',        'high',   'unread',   'Inference spend up 14% day-over-day driven by the new evaluator chain. Recommend throttling low-priority evals.', '{"spend": 14200, "verified": true}'),
-  ('teacher_agent',   'Teacher Agent — Onboarding Playbook Drift', 'Teacher Agent', 'Client Success', 'medium', 'unread',   'Detected three onboarding scripts diverging from the approved playbook. Proposed remediation attached.', NULL),
-  ('reflection_leader','Reflection Leader — Weekly Gap Scan', 'Reflection Leader', 'Strategy & Growth', 'high', 'unread',   'Identified a recurring gap between forecasted and realised onboarding capacity. Recommends a capacity buffer.', '{"gap_value": 38000, "verified": true}'),
-  ('rd_daily',       'R&D Daily — Vector Store Latency', 'R&D Daily Bot', 'Technology',        'low',    'read',     'p95 latency back within SLA after shard rebalance. No action required.', NULL),
-  ('teacher_agent',   'Teacher Agent — Competency Decay Alert', 'Teacher Agent', 'Product',       'medium', 'read',     'Module 7 competency scores dropped 6 pts week-over-week. Suggest refresher content.', NULL),
-  ('reflection_leader','Reflection Leader — Margin Pressure Note', 'Reflection Leader', 'Finance & Ops', 'high', 'actioned', 'Infrastructure overage tracking 18% above plan; flagged for CFO review.', '{"overage": 76000, "verified": true}')
+INSERT INTO reports (source, title, author, dept, priority, status, body, financial_summary, created_by) VALUES
+  ('rd_daily',       'R&D Daily — Model Inference Cost Spike', 'R&D Daily Bot', 'Technology',        'high',   'unread',   'Inference spend up 14% day-over-day driven by the new evaluator chain. Recommend throttling low-priority evals.', '{"spend": 14200, "verified": true}', NULL),
+  ('teacher_agent',   'Teacher Agent — Onboarding Playbook Drift', 'Teacher Agent', 'Client Success', 'medium', 'unread',   'Detected three onboarding scripts diverging from the approved playbook. Proposed remediation attached.', NULL, NULL),
+  ('reflection_leader','Reflection Leader — Weekly Gap Scan', 'Reflection Leader', 'Strategy & Growth', 'high', 'unread',   'Identified a recurring gap between forecasted and realised onboarding capacity. Recommends a capacity buffer.', '{"gap_value": 38000, "verified": true}', NULL),
+  ('rd_daily',       'R&D Daily — Vector Store Latency', 'R&D Daily Bot', 'Technology',        'low',    'read',     'p95 latency back within SLA after shard rebalance. No action required.', NULL, NULL),
+  ('teacher_agent',   'Teacher Agent — Competency Decay Alert', 'Teacher Agent', 'Product',       'medium', 'read',     'Module 7 competency scores dropped 6 pts week-over-week. Suggest refresher content.', NULL, NULL),
+  ('reflection_leader','Reflection Leader — Margin Pressure Note', 'Reflection Leader', 'Finance & Ops', 'high', 'actioned', 'Infrastructure overage tracking 18% above plan; flagged for CFO review.', '{"overage": 76000, "verified": true}', NULL)
 ON CONFLICT DO NOTHING;
 
 -- Seed reflection / gap-discovery initiatives.
-INSERT INTO reflections (title, summary, category, dept, state, recurring, financial_impact, financial_verified) VALUES
-  ('Infrastructure spend acceleration', 'Capex overage of 18% attributed to accelerated rack provisioning. Positive indicator — demand ahead of forecast.', 'lesson', 'Finance', 'promoted', false, 76000, true),
-  ('Client onboarding delay pattern', 'Third successive onboarding delayed by legal review bottleneck. SLA breach risk if unresolved by Q3.', 'issue', 'Client Success', 'open', true, 38000, true),
-  ('Agent task loop detected', 'Open Claw agent entered a retry loop on task #203. Root cause: ambiguous success criteria. Resolved via tighter spec.', 'issue', 'Intelligence (AI)', 'open', true, 0, false),
-  ('NPS upswing — client segment analysis', 'Enterprise NPS rose 13 points. SMB segment flat. Suggests differentiated support investment strategy needed.', 'lesson', 'Client Success', 'promoted', false, 0, false),
-  ('Budget forecast drift', 'Finance forecasts have drifted >10% vs actuals for three consecutive months. Model recalibration overdue.', 'issue', 'Finance', 'open', true, 54000, true)
+INSERT INTO reflections (title, summary, category, dept, state, recurring, financial_impact, financial_verified, created_by) VALUES
+  ('Infrastructure spend acceleration', 'Capex overage of 18% attributed to accelerated rack provisioning. Positive indicator — demand ahead of forecast.', 'lesson', 'Finance', 'promoted', false, 76000, true, NULL),
+  ('Client onboarding delay pattern', 'Third successive onboarding delayed by legal review bottleneck. SLA breach risk if unresolved by Q3.', 'issue', 'Client Success', 'open', true, 38000, true, NULL),
+  ('Agent task loop detected', 'Open Claw agent entered a retry loop on task #203. Root cause: ambiguous success criteria. Resolved via tighter spec.', 'issue', 'Intelligence (AI)', 'open', true, 0, false, NULL),
+  ('NPS upswing — client segment analysis', 'Enterprise NPS rose 13 points. SMB segment flat. Suggests differentiated support investment strategy needed.', 'lesson', 'Client Success', 'promoted', false, 0, false, NULL),
+  ('Budget forecast drift', 'Finance forecasts have drifted >10% vs actuals for three consecutive months. Model recalibration overdue.', 'issue', 'Finance', 'open', true, 54000, true, NULL)
 ON CONFLICT DO NOTHING;

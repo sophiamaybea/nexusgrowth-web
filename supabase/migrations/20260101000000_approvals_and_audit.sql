@@ -17,16 +17,25 @@ CREATE TABLE approvals (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE audit_log (
+CREATE TABLE IF NOT EXISTS audit_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  entity_type TEXT NOT NULL DEFAULT 'approval',
-  entity_id UUID NOT NULL,
-  action TEXT NOT NULL CHECK (action IN ('created', 'approved', 'rejected')),
+  actor TEXT,
+  action TEXT NOT NULL,
+  target TEXT,
+  type TEXT NOT NULL DEFAULT 'system' CHECK (type IN ('agent','system','human','alert')),
+  entity_type TEXT NOT NULL DEFAULT 'system',
+  entity_id UUID,
   actor_id TEXT,
   actor_name TEXT,
   details TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS entity_type TEXT NOT NULL DEFAULT 'system';
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS entity_id UUID;
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS actor_id TEXT;
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS actor_name TEXT;
+ALTER TABLE audit_log DROP CONSTRAINT IF EXISTS audit_log_action_check;
 
 CREATE INDEX idx_approvals_state ON approvals(state);
 CREATE INDEX idx_approvals_created_at ON approvals(created_at DESC);

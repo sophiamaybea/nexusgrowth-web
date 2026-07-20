@@ -1,21 +1,11 @@
-import { TruthBadge } from '../ui/TruthBadge'
 import type { Department } from '../../types/dashboard'
+import { formatCurrency } from '../../lib/format'
 
 const statusLabel = {
   healthy:  { text: 'Healthy',  color: 'text-nexus-success' },
   warning:  { text: 'Attention',color: 'text-nexus-warning' },
   critical: { text: 'Critical', color: 'text-nexus-danger' },
   idle:     { text: 'Idle',     color: 'text-nexus-textMuted' },
-}
-
-function formatCurrency(value: number): string {
-  const formatted = new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Math.abs(value))
-  return `£${formatted}`
 }
 
 export function DeptHealthCard({ dept }: { dept: Department }) {
@@ -44,10 +34,7 @@ export function DeptHealthCard({ dept }: { dept: Department }) {
 
       {/* Budget vs Earned */}
       <div className="pt-2 border-t border-nexus-border/60 space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] text-nexus-textMuted uppercase tracking-wider">Budget vs Earned</p>
-          <TruthBadge tier="verified" showLabel={false} />
-        </div>
+        <p className="text-[10px] text-nexus-textMuted uppercase tracking-wider">Budget vs Earned</p>
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-nexus-textMuted">Budget</span>
           <span className="font-mono text-nexus-text">{formatCurrency(budget)}</span>

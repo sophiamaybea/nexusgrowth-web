@@ -11,6 +11,7 @@ import {
   openReflection,
 } from '../../services/reflections'
 import type { Reflection } from '../../types/reports'
+import { formatCurrency } from '../../lib/format'
 
 type Category = 'all' | 'lesson' | 'issue' | 'decision'
 
@@ -24,16 +25,6 @@ const STATE_VARIANT: Record<Reflection['state'], 'success' | 'warning' | 'muted'
   promoted: 'success',
   open: 'warning',
   killed: 'muted',
-}
-
-function formatCurrency(value: number): string {
-  const formatted = new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Math.abs(value))
-  return `£${formatted}`
 }
 
 export default function ReflectionPage() {

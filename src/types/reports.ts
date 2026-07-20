@@ -19,6 +19,7 @@ export interface Report {
   priority: ReportPriority
   status: ReportStatus
   financial_summary: ReportFinancialSummary | null
+  created_by: string | null
   created_at: string
   updated_at: string
 }
@@ -36,6 +37,7 @@ export interface Reflection {
   recurring: boolean
   financial_impact: number
   financial_verified: boolean
+  created_by: string | null
   created_at: string
   updated_at: string
 }

@@ -1,19 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Panel } from '../../components/ui/Panel'
-import { TruthBadge } from '../../components/ui/TruthBadge'
 import { DeptHealthCard } from '../../components/dashboard/DeptHealthCard'
-import { getDepartments } from '../../services/dashboard'
+import { getDepartments, formatCurrency } from '../../services/dashboard'
 import type { Department } from '../../types/dashboard'
-
-function formatCurrency(value: number): string {
-  const formatted = new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Math.abs(value))
-  return `£${formatted}`
-}
 
 export default function DeptPerformancePage() {
   const [departments, setDepartments] = useState<Department[]>([])
@@ -44,9 +33,6 @@ export default function DeptPerformancePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-display font-semibold text-nexus-text">Department Performance</h1>
-        <span className="text-[11px] text-nexus-textMuted flex items-center gap-1.5">
-          All figures <TruthBadge tier="verified" />
-        </span>
       </div>
 
       {error && (

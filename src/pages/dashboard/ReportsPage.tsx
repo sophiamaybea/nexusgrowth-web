@@ -5,16 +5,7 @@ import { TruthBadge } from '../../components/ui/TruthBadge'
 import { ChevronRight } from 'lucide-react'
 import { getReports, updateReportStatus, reportSourceLabel } from '../../services/reports'
 import type { Report, ReportPriority, ReportStatus, ReportSource } from '../../types/reports'
-
-function formatCurrency(value: number): string {
-  const formatted = new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Math.abs(value))
-  return `£${formatted}`
-}
+import { formatCurrency } from '../../lib/format'
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
