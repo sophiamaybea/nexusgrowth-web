@@ -1,53 +1,55 @@
-import { createContext, useContext, useState, ReactNode } from 'react'
-
-export interface MockUser {
-  id: string
-  name: string
-  role: 'CEO' | 'ADMIN'
-  email: string
-}
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthState {
-  user: MockUser | null
+  user: User | null
+  session: Session | null
   isAuthenticated: boolean
+  loading: boolean
   signIn: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
-  signOut: () => void
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
 
-// Mock credential — replace with real backend when ready
-const MOCK_CREDENTIAL = { email: 'ceo@nexusgrowth.io', password: 'nexus2025' }
-const MOCK_USER: MockUser = { id: 'u_ceo_01', name: 'Sophia', role: 'CEO', email: MOCK_CREDENTIAL.email }
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<MockUser | null>(() => {
-    try {
-      const stored = sessionStorage.getItem('ng_session')
-      return stored ? JSON.parse(stored) : null
-    } catch {
-      return null
-    }
-  })
+  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   async function signIn(email: string, password: string) {
-    // MOCK only — not real authentication
-    await new Promise(r => setTimeout(r, 600))
-    if (email === MOCK_CREDENTIAL.email && password === MOCK_CREDENTIAL.password) {
-      sessionStorage.setItem('ng_session', JSON.stringify(MOCK_USER))
-      setUser(MOCK_USER)
-      return { ok: true }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      return { ok: false, error: error.message }
     }
-    return { ok: false, error: 'Invalid credentials' }
+    return { ok: true }
   }
 
-  function signOut() {
-    sessionStorage.removeItem('ng_session')
-    setUser(null)
+  async function signOut() {
+    await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAuthenticated: !!user, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )

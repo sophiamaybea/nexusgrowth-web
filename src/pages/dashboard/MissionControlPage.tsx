@@ -1,12 +1,62 @@
+import { useEffect, useState } from 'react'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { Panel } from '../../components/ui/Panel'
 import { DeptHealthCard } from '../../components/dashboard/DeptHealthCard'
 import { ActivityItem } from '../../components/dashboard/ActivityItem'
-import { kpiData, deptHealth, activityFeed } from '../../data/dashboardSample'
 import { RefreshCw } from 'lucide-react'
+import { getDepartments, getKpis, getActivityFeed } from '../../services/dashboard'
+import type { ComputedKpis, Department, ActivityEntry } from '../../types/dashboard'
+
+function formatCurrency(value: number): string {
+  const abs = Math.abs(value)
+  const formatted = new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(abs)
+  return value < 0 ? `-£${formatted.slice(1)}` : `£${formatted}`
+}
 
 export default function MissionControlPage() {
-  const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [kpis, setKpis] = useState<ComputedKpis | null>(null)
+  const [activity, setActivity] = useState<ActivityEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const [depts, kpiData, feed] = await Promise.all([
+          getDepartments(),
+          getKpis(),
+          getActivityFeed(),
+        ])
+        setDepartments(depts)
+        setKpis(kpiData)
+        setActivity(feed)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load data')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const kpiItems = kpis
+    ? [
+        { label: 'Revenue MTD', value: formatCurrency(kpis.revenueMtd), trend: 12, status: 'healthy' as const },
+        { label: 'Expenses MTD', value: formatCurrency(kpis.expensesMtd), trend: 5, status: 'healthy' as const },
+        { label: 'Active Depts', value: String(kpis.activeDepartments), trend: 0, status: 'healthy' as const },
+        { label: 'Transactions', value: String(kpis.transactionVolume), trend: 8, status: 'healthy' as const },
+        { label: 'Cash Balance', value: formatCurrency(kpis.cashBalance), trend: kpis.cashBalance >= 0 ? 3 : -3, status: kpis.cashBalance >= 0 ? 'healthy' as const : 'warning' as const },
+        { label: 'Dept Avg Score', value: `${departments.length > 0 ? Math.round(departments.reduce((s, d) => s + d.score, 0) / departments.length) : 0}%`, trend: 2, status: 'healthy' as const },
+      ]
+    : []
 
   return (
     <div className="space-y-6 animate-slide-up">
@@ -14,17 +64,26 @@ export default function MissionControlPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-display font-semibold text-nexus-text">Mission Control</h1>
-          <p className="text-nexus-textMuted text-xs mt-0.5">Real-time operational overview — {now}</p>
+          <p className="text-nexus-textMuted text-xs mt-0.5">Real-time operational overview</p>
         </div>
-        <button className="flex items-center gap-1.5 text-nexus-textMuted hover:text-nexus-text text-xs transition-colors">
+        <button
+          onClick={() => window.location.reload()}
+          className="flex items-center gap-1.5 text-nexus-textMuted hover:text-nexus-text text-xs transition-colors"
+        >
           <RefreshCw size={12} />
           Refresh
         </button>
       </div>
 
+      {error && (
+        <div className="p-4 rounded-lg bg-nexus-danger/10 border border-nexus-danger/30 text-nexus-danger text-xs">
+          {error}
+        </div>
+      )}
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        {kpiData.map(k => (
+        {kpiItems.map((k) => (
           <KpiCard key={k.label} {...k} />
         ))}
       </div>
@@ -33,11 +92,17 @@ export default function MissionControlPage() {
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
         {/* Dept health grid */}
         <Panel title="Department Health" className="xl:col-span-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {deptHealth.map(d => (
-              <DeptHealthCard key={d.name} dept={d} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-nexus-textMuted text-xs py-8 text-center">Loading departments...</div>
+          ) : departments.length === 0 ? (
+            <div className="text-nexus-textMuted text-xs py-8 text-center">No departments found.</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {departments.map((d) => (
+                <DeptHealthCard key={d.id} dept={d} />
+              ))}
+            </div>
+          )}
         </Panel>
 
         {/* Live activity */}
@@ -51,51 +116,38 @@ export default function MissionControlPage() {
             </span>
           }
         >
-          <div className="divide-y divide-nexus-border/30">
-            {activityFeed.map(e => (
-              <ActivityItem key={e.id} entry={e} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-nexus-textMuted text-xs py-8 text-center">Loading activity...</div>
+          ) : activity.length === 0 ? (
+            <div className="text-nexus-textMuted text-xs py-8 text-center">No recent activity.</div>
+          ) : (
+            <div className="divide-y divide-nexus-border/30">
+              {activity.map((e) => (
+                <ActivityItem key={e.id} entry={e} />
+              ))}
+            </div>
+          )}
         </Panel>
       </div>
 
       {/* Bottom: quick-action row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Panel title="Pending Approvals">
-          <div className="space-y-2">
-            {[{ title: 'PR #42 — KPI dashboard', by: 'Open Claw', age: '2h' },
-              { title: 'Budget variance — Infra', by: 'Finance', age: '4h' },
-              { title: 'New client contract',     by: 'Marcus',  age: '1d' }].map(a => (
-              <div key={a.title} className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-nexus-text">{a.title}</p>
-                  <p className="text-[11px] text-nexus-textMuted">by {a.by}</p>
-                </div>
-                <span className="text-[10px] text-nexus-textMuted">{a.age}</span>
-              </div>
-            ))}
-          </div>
+          <div className="text-nexus-textMuted text-xs py-4 text-center">No pending approvals.</div>
         </Panel>
 
         <Panel title="Safety Alerts">
-          <div className="space-y-2">
-            {[{ msg: 'Finance budget variance +18%', level: 'warning' as const },
-              { msg: 'Staging deploy pending review', level: 'info' as const }].map(a => (
-              <div key={a.msg} className="flex items-start gap-2">
-                <span className={`status-dot mt-1.5 ${a.level === 'warning' ? 'warning' : 'idle'}`} />
-                <span className="text-xs text-nexus-textMuted">{a.msg}</span>
-              </div>
-            ))}
-          </div>
+          <div className="text-nexus-textMuted text-xs py-4 text-center">No active alerts.</div>
         </Panel>
 
         <Panel title="System Health">
           <div className="space-y-2">
-            {[{ name: 'API Gateway',     ok: true },
-              { name: 'Agent Runtime',   ok: true },
-              { name: 'Database',        ok: true },
-              { name: 'CDN',             ok: true },
-              { name: 'Finance Service', ok: false }].map(s => (
+            {[
+              { name: 'API Gateway', ok: true },
+              { name: 'Agent Runtime', ok: true },
+              { name: 'Database', ok: true },
+              { name: 'CDN', ok: true },
+            ].map((s) => (
               <div key={s.name} className="flex items-center justify-between">
                 <span className="text-xs text-nexus-textMuted">{s.name}</span>
                 <span className={`status-dot ${s.ok ? 'healthy' : 'warning'}`} />
