@@ -1,16 +1,8 @@
 import { supabase } from '../lib/supabase'
 import type { Department, Transaction, ComputedKpis, ActivityEntry } from '../types/dashboard'
+import { formatCurrency } from '../lib/format'
 
-function formatCurrency(value: number): string {
-  const abs = Math.abs(value)
-  const formatted = new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(abs)
-  return value < 0 ? `-£${formatted.slice(1)}` : `£${formatted}`
-}
+export { formatCurrency }
 
 export async function getDepartments(): Promise<Department[]> {
   const { data, error } = await supabase
